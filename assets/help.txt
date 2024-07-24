@@ -1,0 +1,9 @@
+OPTION          USAGE               DEFAULT EXPLANATION                                             
+--help          --help                      Displays this list.
+--fast          --fast              false   Updates the entire render at once, which is faster.
+--offset        --offset {int}      1       Controls how many generations the program evaluates
+                                            until termination, low is more generations.
+--resolution    --resolution {int}  512x512 Controls the resolution of the render.
+--zoom          --zoom {double}     0.0     Controls the initial zoom of the render.
+--real          --real {double}     0.0     Controls the initial real position of the render.
+--imag          --image {double}    0.0     Controls the initial imaginary position of the render.

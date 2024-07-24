@@ -1,0 +1,9 @@
+CONTROL         ACTION                                                                              
+Esc             Close the render.
+H               Displays this text.
+ArrowUp         Increase the offset of the render. Also refreshes the image. Hold down Ctrl to
+                change it more.
+ArrowDown       Decrease the offset of the render. Also refreshes the image. Hold down Ctrl to
+                change it more.
+LeftMouse       Zoom in, centered on the point where you click.
+C               Toggle color mode
