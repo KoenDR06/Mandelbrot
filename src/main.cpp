@@ -4,8 +4,10 @@
 #include <cmath>
 
 #include "main.h"
+#include "decimal.h"
 
 using namespace cimg_library;
+using dc = decimal;
 
 unsigned char color[3];
 double offset = 1;
