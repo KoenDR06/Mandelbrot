@@ -3,12 +3,7 @@
 #include <fstream>
 #include <cmath>
 
-#include "main.h"
-#include "decimal.h"
-
 using namespace cimg_library;
-using dc = decimal;
-
 unsigned char color[3];
 double offset = 1;
 int sizeX = 512;
@@ -19,17 +14,117 @@ double yCenter = 0;
 bool slow = true;
 bool drawColor = false;
 
+void hsl2rgb(double h, double s, double l) {
+	double a = s * std::min(l, 1.0 - l);
+
+	auto f = [=](double n) -> double {
+		double k = std::fmod(n + h / 30.0, 12.0);
+		return l - a * std::max(std::min({k - 3.0, 9.0 - k, 1.0}), -1.0);
+	};
+
+	color[0] = static_cast<int>(std::round(f(0) * 255));
+	color[1] = static_cast<int>(std::round(f(8) * 255));
+	color[2] = static_cast<int>(std::round(f(4) * 255));
+}
+
+// z = zReal + zImag
+// c = cReal + cImag
+// z^2 + c = (zReal^2 - zImag^2 + cReal) + (2*zReal*zImag + cImag)*i
+void iterate_mandelbrot(double cReal, double cImag, double zReal, double zImag) {
+	double index = 0;
+	while (zImag * zImag + zReal * zReal <= 4) {
+		double tempRe = zReal * zReal - zImag * zImag + cReal;
+		zImag = 2 * zReal * zImag + cImag;
+		zReal = tempRe;
+		index += offset;
+		if (index > 255.0) {
+			color[0] = 0;
+			color[1] = 0;
+			color[2] = 0;
+			break;
+		}
+	}
+	if (index <= 255 && !drawColor) {
+		color[0] = (int)index;
+		color[1] = (int)index;
+		color[2] = (int)index;
+	} else if (index <= 255 && drawColor) {
+			hsl2rgb(index * 360.0 / 255.0, 1.0, 0.5);
+		}
+}
+
+char* getCmdOption(char** begin, char** end, const std::string& option) {
+	char** itr = std::find(begin, end, option);
+	if (itr != end && ++itr != end) {
+		return *itr;
+	}
+	return nullptr;
+}
+
+bool cmdOptionExists(char** begin, char** end, const std::string& option) {
+	return std::find(begin, end, option) != end;
+}
+
+void drawJuliaSet(double xJulia, double yJulia) {
+	CImg<unsigned char> juliaImage(sizeX, sizeY, 1, 3, 0);
+	CImgDisplay juliaDisplay(juliaImage, "Julia");
+
+	bool done = false;
+	int x = 0;
+	int y = 0;
+	while (!done) {
+		iterate_mandelbrot(xJulia, yJulia, 4.0 * x / sizeX - 2.0, 4.0 * y / sizeY - 2.0);
+		juliaImage.draw_point(x, y, color);
+		if (++x > sizeX) {
+			x = 0;
+			y++;
+			if (slow) {
+				juliaImage.display(juliaDisplay);
+			}
+		}
+		if (y > sizeY) {
+			y = 0;
+			if (!slow) {
+				juliaImage.display(juliaDisplay);
+			}
+			done = true;
+		}
+	}
+
+	while (!juliaDisplay.is_closed()) {
+		juliaDisplay.wait();
+		if (juliaDisplay.is_keyESC()) {
+			juliaDisplay.close();
+		}
+	}
+}
+
 int main(int argc, char** argv) {
 	if(cmdOptionExists(argv, argv+argc, "--help")) {
-		std::string line;
-		std::ifstream helpFile("/home/horseman/Programming/MandelbrotCPP/assets/help.txt");
-		while (getline(helpFile, line)) {
-			std::cout << line << "\n";
-		}
-		std::ifstream renderHelpFile("/home/horseman/Programming/MandelbrotCPP/assets/render-help.txt");
-		while (getline(renderHelpFile, line)) {
-			std::cout << line << "\n";
-		}
+		std::cout
+		<< "OPTION          USAGE               DEFAULT EXPLANATION\n"
+		<< "--help          --help                      Displays this list.\n"
+		<< "--fast          --fast              false   Updates the entire render at once, which is faster.\n"
+		<< "--offset        --offset {int}      1       Controls how many generations the program evaluates\n"
+		<< "                                            until termination, low is more generations.\n"
+		<< "--resolution    --resolution {int}  512x512 Controls the resolution of the render.\n"
+		<< "--zoom          --zoom {double}     0.0     Controls the initial zoom of the render.\n"
+		<< "--real          --real {double}     0.0     Controls the initial real position of the render.\n"
+		<< "--imag          --image {double}    0.0     Controls the initial imaginary position of the render.\n"
+		;
+
+		std::cout
+		<< "CONTROL         ACTION\n"
+		<< "Esc             Close the render.\n"
+		<< "H               Displays this text.\n"
+		<< "ArrowUp         Increase the offset of the render. Also refreshes the image. Hold down Ctrl to\n"
+		<< "                change it more.\n"
+		<< "ArrowDown       Decrease the offset of the render. Also refreshes the image. Hold down Ctrl to\n"
+		<< "                change it more.\n"
+		<< "LeftMouse       Zoom in, centered on the point where you click.\n"
+		<< "C               Toggle color mode\n"
+		;
+
 		return 0;
 	}
 
@@ -100,14 +195,20 @@ int main(int argc, char** argv) {
 		}
 
 		if (display.is_keyH()) {
-			std::string line;
-			std::ifstream helpFile("/home/horseman/Programming/MandelbrotCPP/assets/render-help.txt");
-			while (getline(helpFile, line)) {
-				std::cout << line << "\n";
-			}
+			std::cout
+			<< "CONTROL         ACTION\n"
+			<< "Esc             Close the render.\n"
+			<< "H               Displays this text.\n"
+			<< "ArrowUp         Increase the offset of the render. Also refreshes the image. Hold down Ctrl to\n"
+			<< "                change it more.\n"
+			<< "ArrowDown       Decrease the offset of the render. Also refreshes the image. Hold down Ctrl to\n"
+			<< "                change it more.\n"
+			<< "LeftMouse       Zoom in, centered on the point where you click.\n"
+			<< "C               Toggle color mode\n"
+			;
 		}
 
-		if (display.is_keyARROWUP()) {
+if (display.is_keyARROWUP()) {
 			if (display.is_keyCTRLLEFT() || display.is_keyCTRLRIGHT()) {
 				offset /= 0.5;
 			} else {
@@ -165,87 +266,3 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-// z = zReal + zImag
-// c = cReal + cImag
-// z^2 + c = (zReal^2 - zImag^2 + cReal) + (2*zReal*zImag + cImag)*i
-void iterate_mandelbrot(double cReal, double cImag, double zReal, double zImag) {
-	double index = 0;
-	while (zImag * zImag + zReal * zReal <= 4) {
-		double tempRe = zReal * zReal - zImag * zImag + cReal;
-		zImag = 2 * zReal * zImag + cImag;
-		zReal = tempRe;
-		index += offset;
-		if (index > 255.0) {
-			color[0] = 0;
-			color[1] = 0;
-			color[2] = 0;
-			break;
-		}
-	}
-	if (index <= 255 && !drawColor) {
-		color[0] = (int)index;
-		color[1] = (int)index;
-		color[2] = (int)index;
-	} else if (index <= 255 && drawColor) {
-			hsl2rgb(index * 360.0 / 255.0, 1.0, 0.5);
-		}
-}
-
-char* getCmdOption(char** begin, char** end, const std::string& option) {
-	char** itr = std::find(begin, end, option);
-	if (itr != end && ++itr != end) {
-		return *itr;
-	}
-	return nullptr;
-}
-
-bool cmdOptionExists(char** begin, char** end, const std::string& option) {
-	return std::find(begin, end, option) != end;
-}
-
-void hsl2rgb(double h, double s, double l) {
-	double a = s * std::min(l, 1.0 - l);
-
-	auto f = [=](double n) -> double {
-		double k = std::fmod(n + h / 30.0, 12.0);
-		return l - a * std::max(std::min({k - 3.0, 9.0 - k, 1.0}), -1.0);
-	};
-
-	color[0] = static_cast<int>(std::round(f(0) * 255));
-	color[1] = static_cast<int>(std::round(f(8) * 255));
-	color[2] = static_cast<int>(std::round(f(4) * 255));
-}
-
-void drawJuliaSet(double xJulia, double yJulia) {
-	CImg<unsigned char> juliaImage(sizeX, sizeY, 1, 3, 0);
-	CImgDisplay juliaDisplay(juliaImage, "Julia");
-
-	bool done = false;
-	int x = 0;
-	int y = 0;
-	while (!done) {
-		iterate_mandelbrot(xJulia, yJulia, 4.0 * x / sizeX - 2.0, 4.0 * y / sizeY - 2.0);
-		juliaImage.draw_point(x, y, color);
-		if (++x > sizeX) {
-			x = 0;
-			y++;
-			if (slow) {
-				juliaImage.display(juliaDisplay);
-			}
-		}
-		if (y > sizeY) {
-			y = 0;
-			if (!slow) {
-				juliaImage.display(juliaDisplay);
-			}
-			done = true;
-		}
-	}
-
-	while (!juliaDisplay.is_closed()) {
-		juliaDisplay.wait();
-		if (juliaDisplay.is_keyESC()) {
-			juliaDisplay.close();
-		}
-	}
-}
