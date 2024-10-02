@@ -10,7 +10,6 @@ pkgs.mkShell {
     xorg.libXrandr
     xorg.libXrender
     xorg.libXext
-    jetbrains.clion
     ];
 
   shellHook = ''

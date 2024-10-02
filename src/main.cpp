@@ -2,6 +2,7 @@
 #include "CImg.h"
 #include "main.h"
 #include <cmath>
+#include <iomanip>
 
 using namespace cimg_library;
 unsigned char color[3];
@@ -12,7 +13,8 @@ double zoom = 0;
 double xCenter = 0;
 double yCenter = 0;
 bool slow = true;
-bool drawColor = false;
+int drawColor = 0;
+bool ship = false;
 
 int main(int argc, char** argv) {
     if(cmdOptionExists(argv, argv+argc, "--help")) {
@@ -62,7 +64,7 @@ int main(int argc, char** argv) {
         slow = false;
     }
     if(cmdOptionExists(argv, argv+argc, "--color")) {
-        drawColor = true;
+        drawColor = std::atoi(getCmdOption(argv, argv + argc, "--color"));
     }
 
     CImg<unsigned char> image(sizeX, sizeY, 1, 3, 0);
@@ -144,8 +146,14 @@ int main(int argc, char** argv) {
                 offset *= 0.8;
             }
             while (!done) {
+		double scaleFactor = 1.0 * sizeX / sizeY;
                 double pointX = std::exp(-1.0 * zoom) * (4.0 * x / sizeX - 2.0) + xCenter;
                 double pointY = std::exp(-1.0 * zoom) * (4.0 * y / sizeY - 2.0) + yCenter;
+		if (scaleFactor > 1) {
+			pointX = (pointX - xCenter) * scaleFactor + xCenter;
+		} else if (scaleFactor < 1) {
+			pointY = (pointY - yCenter) / scaleFactor + yCenter;
+		}
                 iterate_mandelbrot(pointX, pointY, 0.0, 0.0);
                 image.draw_point(x, y, color);
                 if (++x > sizeX) {
@@ -170,7 +178,7 @@ int main(int argc, char** argv) {
 //		std::cout << "Found an update\n";
     }
 
-    std::cout << "--zoom " << zoom << " --real " << xCenter << " --imag " << yCenter << std::endl;
+    std::cout << std::setprecision(19) << "--zoom " << zoom << " --real " << xCenter << " --imag " << yCenter << std::endl;
     return 0;
 }
 
@@ -193,6 +201,11 @@ void hsl2rgb(double h, double s, double l) {
 void iterate_mandelbrot(double cReal, double cImag, double zReal, double zImag) {
 	double index = 0;
 	while (zImag * zImag + zReal * zReal <= 4) {
+		if (ship) {
+			if (zReal < 0) zReal *= -1;
+			if (zImag < 0) zImag *= -1;
+		}
+
 		double tempRe = zReal * zReal - zImag * zImag + cReal;
 		zImag = 2 * zReal * zImag + cImag;
 		zReal = tempRe;
@@ -204,13 +217,14 @@ void iterate_mandelbrot(double cReal, double cImag, double zReal, double zImag) 
 			break;
 		}
 	}
-	if (index <= 255 && !drawColor) {
+
+	if (index <= 255 && drawColor == 0) {
 		color[0] = (int)index;
 		color[1] = (int)index;
 		color[2] = (int)index;
-	} else if (index <= 255 && drawColor) {
-			hsl2rgb(index * 360.0 / 255.0, 1.0, 0.5);
-		}
+	} else if (index <= 255 && drawColor == 1) {
+		hsl2rgb(index * 360.0 / 255.0, 1.0, 0.5);
+	}
 }
 
 char* getCmdOption(char** begin, char** end, const std::string& option) {
